@@ -19,27 +19,17 @@ class _LoginScreenState extends State<LoginScreen> {
         child: _loading
             ? const CircularProgressIndicator()
             : ElevatedButton(
-                child: const Text('Login with Google'),
+                child: const Text('Start as Guest (0-cost mode)'),
                 onPressed: () async {
                   setState(() => _loading = true);
-                  try {
-                    final user = await AuthService().signInWithGoogle();
-                    if (!mounted) return;
-                    if (user != null) {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LobbyScreen()),
-                      );
-                    }
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Login failed: $e')),
+                  final user = await AuthService().signInAsGuest();
+                  if (!mounted) return;
+                  setState(() => _loading = false);
+                  if (user != null) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LobbyScreen()),
                     );
-                  } finally {
-                    if (mounted) {
-                      setState(() => _loading = false);
-                    }
                   }
                 },
               ),

@@ -1,74 +1,52 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'dart:async';
 import 'package:uuid/uuid.dart';
 
 class RoomService {
-  RoomService()
-      : _db = FirebaseDatabase.instanceFor(
-          databaseURL:
-              'https://rumble-de032-default-rtdb.asia-southeast1.firebasedatabase.app/',
-        );
+  static final Map<String, Map<String, dynamic>> _rooms = {};
+  static final Map<String, Map<String, dynamic>> _stats = {};
 
-  final FirebaseDatabase _db;
-
-  DatabaseReference get _roomsRef => _db.ref('rooms');
-  DatabaseReference get _statsRef => _db.ref('stats');
-  DatabaseReference get _premiumRef => _db.ref('premium');
-  DatabaseReference get _reportsRef => _db.ref('reports');
+  final StreamController<Map<String, dynamic>?> _roomController =
+      StreamController<Map<String, dynamic>?>.broadcast();
 
   Future<String> createRoom(String hostId) async {
     final id = const Uuid().v4().substring(0, 6).toUpperCase();
-    await _roomsRef.child(id).set({
+    _rooms[id] = {
       'hostId': hostId,
       'status': 'active',
-      'createdAt': ServerValue.timestamp,
       'players': {hostId: true},
       'cards': {
         'AS': {'x': 40.0, 'y': 400.0, 'updatedBy': hostId},
         'KH': {'x': 120.0, 'y': 400.0, 'updatedBy': hostId},
         '7D': {'x': 200.0, 'y': 400.0, 'updatedBy': hostId},
       }
-    });
+    };
+    _roomController.add(_rooms[id]);
     return id;
   }
 
   Future<bool> joinRoom(String roomId, String uid) async {
     final normalized = roomId.toUpperCase();
-    final roomSnap = await _roomsRef.child(normalized).get();
-    if (!roomSnap.exists) return false;
-
-    await _roomsRef.child('$normalized/players/$uid').set(true);
-    await _roomsRef
-        .child('$normalized/playerMeta/$uid')
-        .update({'joinedAt': ServerValue.timestamp, 'role': 'guest'});
+    final room = _rooms[normalized];
+    if (room == null) return false;
+    (room['players'] as Map<String, dynamic>)[uid] = true;
+    _roomController.add(room);
     return true;
   }
 
   Future<String?> joinRandomRoom(String uid) async {
-    final rooms = await _roomsRef.get();
-    if (!rooms.exists || rooms.value is! Map) return null;
-
-    final map = Map<String, dynamic>.from(rooms.value as Map);
-    for (final entry in map.entries) {
-      final roomId = entry.key;
-      final value = entry.value;
-      if (value is! Map) continue;
-      final status = value['status'];
-      final players = value['players'];
-      final playerCount = players is Map ? players.length : 0;
-      if (status == 'active' && playerCount < 4) {
-        await joinRoom(roomId, uid);
-        return roomId;
+    for (final entry in _rooms.entries) {
+      final players = (entry.value['players'] as Map<String, dynamic>);
+      if (entry.value['status'] == 'active' && players.length < 4) {
+        await joinRoom(entry.key, uid);
+        return entry.key;
       }
     }
     return null;
   }
 
-  Stream<Map<String, dynamic>?> watchRoom(String roomId) {
-    return _roomsRef.child(roomId.toUpperCase()).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value == null || value is! Map) return null;
-      return Map<String, dynamic>.from(value);
-    });
+  Stream<Map<String, dynamic>?> watchRoom(String roomId) async* {
+    yield _rooms[roomId.toUpperCase()];
+    yield* _roomController.stream;
   }
 
   Future<void> updateCardPosition({
@@ -78,12 +56,11 @@ class RoomService {
     required double y,
     required String uid,
   }) async {
-    await _roomsRef.child('${roomId.toUpperCase()}/cards/$cardId').update({
-      'x': x,
-      'y': y,
-      'updatedBy': uid,
-      'updatedAt': ServerValue.timestamp,
-    });
+    final room = _rooms[roomId.toUpperCase()];
+    if (room == null) return;
+    final cards = room['cards'] as Map<String, dynamic>;
+    cards[cardId] = {'x': x, 'y': y, 'updatedBy': uid};
+    _roomController.add(room);
   }
 
   Future<void> saveMatchResult({
@@ -91,24 +68,10 @@ class RoomService {
     required bool won,
     required int scoreDelta,
   }) async {
-    final ref = _statsRef.child(uid);
-    final current = await ref.get();
-    final data = (current.value as Map?)?.cast<String, dynamic>() ?? {};
-    final wins = (data['wins'] as num?)?.toInt() ?? 0;
-    final score = (data['score'] as num?)?.toInt() ?? 0;
-    await ref.update({
-      'wins': won ? wins + 1 : wins,
-      'score': score + scoreDelta,
-      'updatedAt': ServerValue.timestamp,
-    });
-  }
-
-  Stream<Map<String, dynamic>?> watchPremium(String uid) {
-    return _premiumRef.child(uid).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value == null || value is! Map) return null;
-      return Map<String, dynamic>.from(value);
-    });
+    final stat = _stats[uid] ?? {'wins': 0, 'score': 0};
+    stat['wins'] = (stat['wins'] as int) + (won ? 1 : 0);
+    stat['score'] = (stat['score'] as int) + scoreDelta;
+    _stats[uid] = stat;
   }
 
   Future<void> reportAbuse({
@@ -116,13 +79,5 @@ class RoomService {
     required String reporterId,
     required String offenderId,
     String reason = 'unspecified',
-  }) async {
-    await _reportsRef.push().set({
-      'roomId': roomId.toUpperCase(),
-      'reporterId': reporterId,
-      'offenderId': offenderId,
-      'reason': reason,
-      'createdAt': ServerValue.timestamp,
-    });
-  }
+  }) async {}
 }
