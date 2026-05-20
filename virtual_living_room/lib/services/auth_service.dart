@@ -1,9 +1,4 @@
-class AppUser {
-  final String uid;
-  final String displayName;
-
-  AppUser({required this.uid, required this.displayName});
-}
+import '../models/app_user.dart';
 
 class AuthService {
   static AppUser? _currentUser;

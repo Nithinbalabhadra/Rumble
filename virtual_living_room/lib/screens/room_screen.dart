@@ -10,7 +10,7 @@ class RoomScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uid = AuthService().currentUser?.uid;
-    final roomService = RoomService();
+    final roomService = RoomService.instance;
 
     return Scaffold(
       appBar: AppBar(title: Text('Room $roomId')),

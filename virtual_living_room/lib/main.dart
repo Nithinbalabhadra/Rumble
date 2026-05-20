@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'config/app_config.dart';
 import 'screens/login_screen.dart';
 
 void main() {
@@ -10,11 +11,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeLabel = AppConfig.dataMode.name.toUpperCase();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Virtual Living Room',
       theme: ThemeData.dark(),
-      home: const LoginScreen(),
+      home: LoginScreen(modeLabel: modeLabel),
     );
   }
 }
