@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import 'lobby_screen.dart';
 
@@ -53,7 +54,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String? _validateInputs() {
-    if (_nameController.text.trim().isEmpty) return 'Enter display name.';
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return 'Enter player name.';
+    if (name.length < 3) return 'Player name must be at least 3 characters.';
     if (!_emailRegex.hasMatch(_emailController.text.trim())) return 'Enter a valid Gmail address.';
     if (!_mobileRegex.hasMatch(_mobileController.text.trim())) return 'Enter a valid 10-digit mobile number.';
     if (_profileImageController.text.trim().isEmpty) return 'Add signup profile image path or URL.';
@@ -75,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 8),
               Text('Mode: ${widget.modeLabel}'),
               const SizedBox(height: 16),
-              TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Display name')),
+              TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Player name (must be unique)')),
               const SizedBox(height: 10),
               TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Gmail address')),
               const SizedBox(height: 10),
@@ -112,14 +115,29 @@ class _LoginScreenState extends State<LoginScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
                             return;
                           }
+                          final auth = AuthService();
+                          final available = await auth.isDisplayNameAvailable(_nameController.text);
+                          if (!available) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name already taken. Choose another player name.')));
+                            return;
+                          }
+
                           setState(() => _loading = true);
-                          final user = await AuthService().signUpOnce(
-                            displayName: _nameController.text,
-                            email: _emailController.text,
-                            mobileNumber: _mobileController.text,
-                            profileImagePath: _profileImageController.text,
-                            isVerifiedAtSignup: true,
-                          );
+                          AppUser? user;
+                          try {
+                            user = await auth.signUpOnce(
+                              displayName: _nameController.text,
+                                email: _emailController.text,
+                                mobileNumber: _mobileController.text,
+                                profileImagePath: _profileImageController.text,
+                                isVerifiedAtSignup: true,
+                            );
+                          } on StateError catch (e) {
+                            if (!mounted) return;
+                            setState(() => _loading = false);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${e.message}')));
+                            return;
+                          }
                           if (!mounted) return;
                           setState(() => _loading = false);
                           if (user != null) {

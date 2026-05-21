@@ -8,6 +8,7 @@ class AuthService {
   static const _kMobile = 'auth_mobile';
   static const _kImage = 'auth_profile_image';
   static const _kVerified = 'auth_verified';
+  static const _kTakenNames = 'taken_display_names';
 
   static AppUser? _currentUser;
 
@@ -30,6 +31,15 @@ class AuthService {
     return _currentUser;
   }
 
+  Future<bool> isDisplayNameAvailable(String name) async {
+    final normalized = _normalizeName(name);
+    if (normalized.isEmpty) return false;
+
+    final prefs = await SharedPreferences.getInstance();
+    final taken = prefs.getStringList(_kTakenNames) ?? <String>[];
+    return !taken.contains(normalized);
+  }
+
   Future<AppUser?> signUpOnce({
     required String displayName,
     required String email,
@@ -37,16 +47,25 @@ class AuthService {
     required String profileImagePath,
     required bool isVerifiedAtSignup,
   }) async {
+    final normalized = _normalizeName(displayName);
+    final prefs = await SharedPreferences.getInstance();
+    final taken = prefs.getStringList(_kTakenNames) ?? <String>[];
+
+    if (taken.contains(normalized)) {
+      throw StateError('This player name is already taken. Choose a unique name.');
+    }
+
     final user = AppUser(
       uid: DateTime.now().millisecondsSinceEpoch.toString(),
-      displayName: displayName,
+      displayName: displayName.trim(),
       email: email.trim().toLowerCase(),
       mobileNumber: mobileNumber.trim(),
       profileImagePath: profileImagePath.trim(),
       isVerifiedAtSignup: isVerifiedAtSignup,
     );
 
-    final prefs = await SharedPreferences.getInstance();
+    taken.add(normalized);
+    await prefs.setStringList(_kTakenNames, taken);
     await prefs.setString(_kUid, user.uid);
     await prefs.setString(_kName, user.displayName);
     await prefs.setString(_kEmail, user.email);
@@ -57,6 +76,8 @@ class AuthService {
     _currentUser = user;
     return _currentUser;
   }
+
+  String _normalizeName(String name) => name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
