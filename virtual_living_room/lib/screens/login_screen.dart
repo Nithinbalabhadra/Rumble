@@ -12,34 +12,128 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
+  bool _isAdult = false;
+  bool _livenessAck = false;
+  bool _idAck = false;
+
+  final _nameController = TextEditingController(text: 'Rumble Player');
+  final _emailController = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _profileImageController = TextEditingController();
+
+  final _emailRegex = RegExp(r'^[^@\s]+@gmail\.com$');
+  final _mobileRegex = RegExp(r'^[0-9]{10}$');
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreAndContinueIfSignedUp();
+  }
+
+  Future<void> _restoreAndContinueIfSignedUp() async {
+    setState(() => _loading = true);
+    final user = await AuthService().restoreSession();
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (user != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LobbyScreen()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _mobileController.dispose();
+    _profileImageController.dispose();
+    super.dispose();
+  }
+
+  String? _validateInputs() {
+    if (_nameController.text.trim().isEmpty) return 'Enter display name.';
+    if (!_emailRegex.hasMatch(_emailController.text.trim())) return 'Enter a valid Gmail address.';
+    if (!_mobileRegex.hasMatch(_mobileController.text.trim())) return 'Enter a valid 10-digit mobile number.';
+    if (_profileImageController.text.trim().isEmpty) return 'Add signup profile image path or URL.';
+    if (!_isAdult || !_livenessAck || !_idAck) return 'Complete all verification acknowledgements.';
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Mode: ${widget.modeLabel}'),
-            const SizedBox(height: 12),
-            _loading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    child: const Text('Start as Guest (0-cost mode)'),
-                    onPressed: () async {
-                      setState(() => _loading = true);
-                      final user = await AuthService().signInAsGuest();
-                      if (!mounted) return;
-                      setState(() => _loading = false);
-                      if (user != null) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LobbyScreen()),
-                        );
-                      }
-                    },
-                  ),
-          ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Rumble', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text('Mode: ${widget.modeLabel}'),
+              const SizedBox(height: 16),
+              TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Display name')),
+              const SizedBox(height: 10),
+              TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Gmail address')),
+              const SizedBox(height: 10),
+              TextField(controller: _mobileController, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'Mobile number', counterText: '')),
+              const SizedBox(height: 10),
+              TextField(controller: _profileImageController, decoration: const InputDecoration(labelText: 'Signup image URL/path')),
+              CheckboxListTile(
+                value: _isAdult,
+                onChanged: (v) => setState(() => _isAdult = v ?? false),
+                title: const Text('I confirm I am 18+'),
+                contentPadding: EdgeInsets.zero,
+              ),
+              CheckboxListTile(
+                value: _livenessAck,
+                onChanged: (v) => setState(() => _livenessAck = v ?? false),
+                title: const Text('Verification completed at signup (camera blink/liveness)'),
+                contentPadding: EdgeInsets.zero,
+              ),
+              CheckboxListTile(
+                value: _idAck,
+                onChanged: (v) => setState(() => _idAck = v ?? false),
+                title: const Text('Aadhaar fallback verification acknowledged at signup'),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 12),
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final error = _validateInputs();
+                          if (error != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+                            return;
+                          }
+                          setState(() => _loading = true);
+                          final user = await AuthService().signUpOnce(
+                            displayName: _nameController.text,
+                            email: _emailController.text,
+                            mobileNumber: _mobileController.text,
+                            profileImagePath: _profileImageController.text,
+                            isVerifiedAtSignup: true,
+                          );
+                          if (!mounted) return;
+                          setState(() => _loading = false);
+                          if (user != null) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => const LobbyScreen()),
+                            );
+                          }
+                        },
+                        child: const Text('Complete Signup'),
+                      ),
+                    ),
+            ],
+          ),
         ),
       ),
     );
