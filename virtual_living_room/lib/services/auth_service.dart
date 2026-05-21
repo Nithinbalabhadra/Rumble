@@ -8,6 +8,7 @@ class AuthService {
   static const _kMobile = 'auth_mobile';
   static const _kImage = 'auth_profile_image';
   static const _kVerified = 'auth_verified';
+  static const _kPremiumHost = 'auth_premium_host';
   static const _kTakenNames = 'taken_display_names';
 
   static AppUser? _currentUser;
@@ -27,6 +28,7 @@ class AuthService {
       mobileNumber: prefs.getString(_kMobile) ?? '',
       profileImagePath: prefs.getString(_kImage) ?? '',
       isVerifiedAtSignup: prefs.getBool(_kVerified) ?? false,
+      isPremiumHost: prefs.getBool(_kPremiumHost) ?? false,
     );
     return _currentUser;
   }
@@ -62,6 +64,7 @@ class AuthService {
       mobileNumber: mobileNumber.trim(),
       profileImagePath: profileImagePath.trim(),
       isVerifiedAtSignup: isVerifiedAtSignup,
+      isPremiumHost: false,
     );
 
     taken.add(normalized);
@@ -72,9 +75,25 @@ class AuthService {
     await prefs.setString(_kMobile, user.mobileNumber);
     await prefs.setString(_kImage, user.profileImagePath);
     await prefs.setBool(_kVerified, user.isVerifiedAtSignup);
+    await prefs.setBool(_kPremiumHost, user.isPremiumHost);
 
     _currentUser = user;
     return _currentUser;
+  }
+
+  Future<void> setPremiumHost(bool enabled) async {
+    if (_currentUser == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kPremiumHost, enabled);
+    _currentUser = AppUser(
+      uid: _currentUser!.uid,
+      displayName: _currentUser!.displayName,
+      email: _currentUser!.email,
+      mobileNumber: _currentUser!.mobileNumber,
+      profileImagePath: _currentUser!.profileImagePath,
+      isVerifiedAtSignup: _currentUser!.isVerifiedAtSignup,
+      isPremiumHost: enabled,
+    );
   }
 
   String _normalizeName(String name) => name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
@@ -87,6 +106,7 @@ class AuthService {
     await prefs.remove(_kMobile);
     await prefs.remove(_kImage);
     await prefs.remove(_kVerified);
+    await prefs.remove(_kPremiumHost);
     _currentUser = null;
   }
 }
