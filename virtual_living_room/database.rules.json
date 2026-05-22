@@ -1,0 +1,60 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        "hostId": {
+          ".write": "auth != null && !data.exists()"
+        },
+        "status": {
+          ".write": "auth != null"
+        },
+        "createdAt": {
+          ".write": "auth != null"
+        },
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".read": "auth != null"
+          }
+        },
+        "playerMeta": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".read": "auth != null"
+          }
+        },
+        "cards": {
+          "$cardId": {
+            ".read": "auth != null",
+            ".write": "auth != null"
+          }
+        }
+      }
+    },
+    "stats": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "premium": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+    "reports": {
+      "$reportId": {
+        ".read": false,
+        ".write": "auth != null"
+      }
+    },
+    "banned_users": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}
