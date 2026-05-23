@@ -50,7 +50,7 @@ class TrialPaywallWidget extends StatelessWidget {
               '2) Take payment screenshot\n'
               '3) Send screenshot + mobile number to WhatsApp: $whatsappSupport\n'
               '4) Admin sets isPremiumHost=true after manual verification',
-              style: const TextStyle(color: Colors.white90, height: 1.4),
+              style: const TextStyle(color: Colors.white70, height: 1.4),
             ),
           ),
           const SizedBox(height: 16),
