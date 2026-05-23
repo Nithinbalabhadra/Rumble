@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can only read/write their own document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Anyone authenticated can read rooms
+    // Only premium hosts can CREATE rooms (host pass expiry checked)
+    // Any room participant can UPDATE (card moves, score updates)
+    match /rooms/{roomId} {
+      allow read: if request.auth != null;
+      
+      allow create: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPremiumHost == true &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.hostPassExpiry > request.time;
+      
+      allow update, delete: if request.auth != null;
+    }
+
+    // Reports can be created by any authenticated user
+    // Admin can read/update reports
+    match /reports/{reportId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false; // admin only via Cloud Functions
+    }
+
+    // Banned users list (phone hash-based)
+    match /banned_users/{phoneHash} {
+      allow read: if false;
+      allow write: if false; // admin only via Cloud Functions
+    }
+
+    // Audit logs for moderation compliance
+    match /audit_logs/{logId} {
+      allow read: if false;
+      allow write: if false; // admin only via Cloud Functions
+    }
+
+    // Transactions log for payment tracking
+    match /transactions/{txId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false; // server/webhook only
+    }
+  }
+}
